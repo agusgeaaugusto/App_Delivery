@@ -70,6 +70,19 @@ function renderAmounts(){
       $$(".amount").forEach(x=>x.classList.remove("amount--active"));
       b.classList.add("amount--active");
       $("#selected-amount").textContent = `Monto: ${formatGs(v)}`;
+
+      const client = normalizeClientName($("#txt-cliente").value);
+      if(client){
+        addEntry(loadData(), client, v);
+        $("#txt-cliente").value = "";
+        $("#selected-amount").textContent = "Seleccioná un monto";
+        $$(".amount").forEach(x=>x.classList.remove("amount--active"));
+        selectedAmount = null;
+        toast("Delivery guardado 🚀");
+        refresh();
+      }else{
+        toast("Escribí nombre/ubicación primero");
+      }
     });
     wrap.appendChild(b);
   });
@@ -136,7 +149,7 @@ function renderTable(data){
       <td>${formatDateTime(e.ts)}</td>
       <td>${escapeHtml(e.client)}</td>
       <td><b>${formatGs(e.amount)}</b></td>
-      <td><button class="linkbtn linkbtn--danger" type="button">Eliminar</button></td>
+      <td><button class="linkbtn linkbtn--danger" type="button" title="Eliminar">🗑️</button></td>
     `;
     tr.querySelector("button").addEventListener("click", ()=>{
       if(!confirm("¿Eliminar este registro?")) return;
@@ -312,7 +325,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     $("#txt-cliente").value = "";
     if(activeClientChip) activeClientChip.classList.remove("client--active");
     activeClientChip = null;
-    toast("Guardado ✅");
+    toast("Guardado 🚀");
     refresh();
   });
 
