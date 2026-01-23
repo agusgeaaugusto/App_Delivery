@@ -31,21 +31,68 @@ function toDateInputValue(d){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
-function loadData(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return { entries: [] };
-    const obj = JSON.parse(raw);
-    if(!obj || !Array.isArray(obj.entries)) return { entries: [] };
-    return obj;
-  }catch{
-    return { entries: [] };
+
+// ===== Firebase Realtime (opcional) =====
+let RT = { enabled: false, entries: [], unsub: null };
+
+async function initRealtime(){
+  if(!window.FirebaseRT || typeof window.FirebaseRT.init !== "function"){
+    return false;
   }
-}
-function saveData(data){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const r = await window.FirebaseRT.init();
+  RT.enabled = !!(r && r.enabled);
+
+  if(!RT.enabled){
+    return false;
+  }
+
+  const col = window.FirebaseRT._collection("deliveries");
+  const q = window.FirebaseRT._query(col, window.FirebaseRT._orderBy("ts", "desc"));
+
+  if(RT.unsub) RT.unsub();
+  RT.unsub = window.FirebaseRT._onSnapshot(q, (snap)=>{
+    RT.entries = snap.docs.map(d=>({
+      id: d.id,
+      client: d.data().client || "",
+      amount: Number(d.data().amount)||0,
+      ts: d.data().ts?.toDate ? d.data().ts.toDate().toISOString() : (d.data().tsISO || nowISO())
+    }));
+    saveLocalCache(RT.entries);
+    refresh();
+  });
+
+  toast("Sync en tiempo real ✅");
+  return true;
 }
 
+function loadLocalCache(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return [];
+    const obj = JSON.parse(raw);
+    if(!obj || !Array.isArray(obj.entries)) return [];
+    return obj.entries;
+  }catch{ return []; }
+}
+function saveLocalCache(entries){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({entries}));
+  }catch{}
+}
+
+// Fuente de datos:
+// - Con Firebase: listener en tiempo real (Firestore) + cache local
+// - Sin Firebase: localStorage
+function loadData(){
+  if(RT.enabled){
+    return { entries: RT.entries };
+  }
+  return { entries: loadLocalCache() };
+}
+function saveData(data){
+  saveLocalCache((data && data.entries) ? data.entries : []);
+}
+// ===== fin Firebase =====
 function toast(msg){
   const el = $("#toast");
   el.textContent = msg;
@@ -220,12 +267,18 @@ function renderClients(data){
 }
 
 function addEntry(data, client, amount){
-  const entry = {
-    id: cryptoRandomId(),
-    client,
-    amount,
-    ts: nowISO()
-  };
+  const entry = { id: cryptoRandomId(), client, amount, ts: nowISO() };
+
+  if(RT.enabled && window.FirebaseRT){
+    const col = window.FirebaseRT._collection("deliveries");
+    return window.FirebaseRT._addDoc(col, {
+      client,
+      amount,
+      ts: window.FirebaseRT._serverTimestamp(),
+      tsISO: entry.ts
+    });
+  }
+
   data.entries.push(entry);
   saveData(data);
 }
@@ -301,10 +354,12 @@ function setupPWAInstall(){
   }
 }
 
-document.addEventListener("DOMContentLoaded", ()=>{
+document.addEventListener("DOMContentLoaded", async ()=>{
   renderAmounts();
   setupPWAInstall();
 
+  // Iniciar realtime (si configuraste Firebase). Si no, se usa localStorage.
+  await initRealtime();
   const data = loadData();
 
   // default filters: today
