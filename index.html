@@ -45,6 +45,10 @@
       <div class="amounts" id="amounts">
         <!-- buttons injected -->
       </div>
+      <div class="extra">
+        <input id="extra-amount" class="input" type="number" inputmode="numeric" min="0" step="100" placeholder="Monto extra (Gs) — ej: 15000" />
+        <button class="btn btn--black" id="btn-guardar-extra" type="button">Guardar extra</button>
+      </div>
       <div class="row row--tight">
         <div class="pill" id="selected-amount">Seleccioná un monto</div>
         <!-- Guardado automático al tocar monto -->
@@ -88,10 +92,6 @@
           <div class="summary__label">Ganancia (día)</div>
           <div class="summary__value" id="sum-ganancias">Gs 0</div>
         </div>
-      </div>
-
-      <div class="row row--tight">
-        <button class="btn btn--black" id="btn-export" type="button">Exportar CSV (filtro)</button>
       </div>
 
       <h2 style="margin-top:14px;">Lista de deliveries</h2>

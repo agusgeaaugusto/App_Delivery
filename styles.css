@@ -386,3 +386,19 @@ h2{
 .modal__body{
   padding: 12px;
 }
+
+.extra{
+  display:flex;
+  gap:10px;
+  margin-top: 10px;
+  align-items:center;
+}
+.extra .input{ flex:1; }
+.extra .btn{ width: auto; white-space: nowrap; }
+@media (max-width: 680px){
+  .extra{ flex-direction: column; align-items: stretch; }
+  .extra .btn{ width: 100%; }
+}
+
+/* Asegurar que el texto del monto se vea siempre arriba del decorado */
+.amount span{ position: relative; z-index: 3; }

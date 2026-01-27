@@ -409,6 +409,30 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     $("#txt-cliente").value = "";
     $("#txt-cliente").focus();
   });
+
+  // Guardar monto extra (cuando no está en los bloques)
+  const btnExtra = $("#btn-guardar-extra");
+  if(btnExtra){
+    btnExtra.addEventListener("click", async ()=>{
+      const client = normalizeClientName($("#txt-cliente").value);
+      const val = Number($("#extra-amount").value || 0);
+      if(!client){
+        toast("Falta nombre/ubicación.");
+        $("#txt-cliente").focus();
+        return;
+      }
+      if(!val || val <= 0){
+        toast("Ingresá un monto extra válido.");
+        $("#extra-amount").focus();
+        return;
+      }
+      await addEntry(loadData(), client, val);
+      $("#txt-cliente").value = "";
+      $("#extra-amount").value = "";
+      toast("Extra guardado ✅");
+      refresh();
+    });
+  }
 refresh();
   });
 refresh();
@@ -443,9 +467,7 @@ refresh();
     refresh();
     closeSettings();
   });
-$("#btn-export").addEventListener("click", ()=>{
-    exportCSV(loadData());
-  });
+});
 
     // Refresh on filter changes
   ["change","input"].forEach(evt=>{
