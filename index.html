@@ -31,31 +31,30 @@
       <h2>1) Nombre y ubicación</h2>
       <div class="row">
         <input id="txt-cliente" class="input" type="text" placeholder="Ej: Juan Pérez - Barrio Centro" autocomplete="off" />
-        <button class="btn btn--black" id="btn-limpiar" type="button">Limpiar</button>
-      </div>
-
-      <div class="hint">Tip: tocá un cliente guardado abajo para autocompletar.</div>
-    </section>
+</div>
+</section>
 
     <section class="card">
       <h2>2) Tocá el monto (se guarda automático)</h2>
       <div class="amounts" id="amounts">
         <!-- buttons injected -->
       </div>
+
+      <div class="row">
+        <input id="custom-amount" class="input" type="number" inputmode="numeric" placeholder="Otro monto (Gs)..." min="0" />
+        <button class="btn btn--black" id="btn-custom-save" type="button">Guardar monto</button>
+      </div>
+
       <div class="row row--tight">
         <div class="pill" id="selected-amount">Seleccioná un monto</div>
         <!-- Guardado automático al tocar monto -->
       </div>
-      <div class="mini">
-        Se guarda automáticamente con <b>fecha y hora</b>.
-      </div>
-    </section>
+</section>
 
     <section class="card">
       <h2>Clientes frecuentes</h2>
       <div class="clients" id="clients"></div>
-      <div class="mini">Estos bloques se quedan (se guardan en tu celular / navegador).</div>
-    </section>
+</section>
 
     <section class="card">
       <h2>Filtros</h2>
@@ -68,15 +67,9 @@
           <span>Hasta</span>
           <input class="input" id="f-to" type="date" />
         </label>
-        <label class="field field--wide">
-          <span>Cliente</span>
-          <input class="input" id="f-client" type="text" placeholder="Buscar cliente..." />
-        </label>
-      </div>
+</div>
       <div class="row row--tight">
-        <button class="btn btn--ghost" id="btn-hoy" type="button">Hoy</button>
-        <button class="btn btn--ghost" id="btn-7d" type="button">Últimos 7 días</button>
-        <button class="btn btn--danger" id="btn-borrar-todo" type="button" title="Borra todo lo guardado">Borrar todo</button>
+<button class="btn btn--danger" id="btn-borrar-todo" type="button" title="Borra todo lo guardado">Borrar todo</button>
       </div>
     </section>
 
@@ -87,20 +80,11 @@
           <div class="summary__value" id="sum-corridas">0</div>
         </div>
         <div class="summary__item">
-          <div class="summary__label">Ganancias</div>
+          <div class="summary__label">Total general</div>
           <div class="summary__value" id="sum-ganancias">Gs 0</div>
         </div>
-        <div class="summary__item">
-          <div class="summary__label">Subtotal (filtro)</div>
-          <div class="summary__value" id="sum-subtotal">Gs 0</div>
-        </div>
       </div>
-
-      <div class="row row--tight">
-        <button class="btn btn--black" id="btn-export" type="button">Exportar CSV</button>
-      </div>
-
-      <h2 style="margin-top:14px;">Lista de deliveries</h2>
+<h2 style="margin-top:14px;">Lista de deliveries</h2>
       <div class="tablewrap">
         <table class="table">
           <thead>
@@ -115,11 +99,7 @@
         </table>
       </div>
     </section>
-
-    <footer class="footer">
-      <div>Funciona offline ✅ · Datos guardados en el dispositivo · Ideal para celular 📱</div>
-    </footer>
-  </main>
+</main>
 
   <div class="toast" id="toast" aria-live="polite"></div>
   <!-- Firebase (CDN) + config -->

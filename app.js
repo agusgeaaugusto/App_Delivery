@@ -13,6 +13,35 @@ const STORAGE_KEY = "delivery_diario_v1";
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+function onEl(sel, evt, fn){
+  const el = $(sel);
+  if(el) el.addEventListener(evt, fn);
+}
+
+function resetAmountUI(){
+  const pill = $("#selected-amount");
+  if(pill) pill.textContent = "Seleccioná un monto";
+  $$(".amount").forEach(x=>x.classList.remove("amount--active"));
+  selectedAmount = null;
+}
+
+function trySaveDelivery(amount){
+  const client = normalizeClientName($("#txt-cliente").value);
+  if(!client){
+    toast("Escribí nombre/ubicación primero");
+    $("#txt-cliente").focus();
+    return;
+  }
+  addEntry(loadData(), client, amount);
+  $("#txt-cliente").value = "";
+  resetAmountUI();
+  const ca = $("#custom-amount");
+  if(ca) ca.value = "";
+  toast("Delivery guardado 🚀");
+  refresh();
+}
+
+
 function nowISO(){
   return new Date().toISOString();
 }
@@ -128,19 +157,7 @@ function renderAmounts(){
       $$(".amount").forEach(x=>x.classList.remove("amount--active"));
       b.classList.add("amount--active");
       $("#selected-amount").textContent = `Monto: ${formatGs(v)}`;
-
-      const client = normalizeClientName($("#txt-cliente").value);
-      if(client){
-        addEntry(loadData(), client, v);
-        $("#txt-cliente").value = "";
-        $("#selected-amount").textContent = "Seleccioná un monto";
-        $$(".amount").forEach(x=>x.classList.remove("amount--active"));
-        selectedAmount = null;
-        toast("Delivery guardado 🚀");
-        refresh();
-      }else{
-        toast("Escribí nombre/ubicación primero");
-      }
+      trySaveDelivery(v);
     });
     wrap.appendChild(b);
   });
@@ -153,9 +170,7 @@ function normalizeClientName(s){
 function getFilters(){
   const from = $("#f-from").value;
   const to = $("#f-to").value;
-  const client = normalizeClientName($("#f-client").value).toLowerCase();
-
-  return { from, to, client };
+  return { from, to };
 }
 
 function inDateRange(iso, from, to){
@@ -176,24 +191,17 @@ function inDateRange(iso, from, to){
 }
 
 function getFilteredEntries(data){
-  const {from, to, client} = getFilters();
+  const {from, to} = getFilters();
   return data.entries
     .filter(e => inDateRange(e.ts, from, to))
-    .filter(e => !client || (e.client || "").toLowerCase().includes(client))
     .sort((a,b)=> (a.ts < b.ts ? 1 : -1));
 }
 
-function summarize(entries){
-  const corridas = entries.length;
-  const subtotal = entries.reduce((acc,e)=> acc + (Number(e.amount)||0), 0);
-  return { corridas, subtotal };
-}
 
 function renderSummaryAllAndFiltered(data, filtered){
   const all = data.entries;
   $("#sum-corridas").textContent = all.length;
   $("#sum-ganancias").textContent = formatGs(all.reduce((a,e)=>a+(Number(e.amount)||0),0));
-  $("#sum-subtotal").textContent = formatGs(filtered.reduce((a,e)=>a+(Number(e.amount)||0),0));
 }
 
 function renderTable(data){
@@ -209,8 +217,22 @@ function renderTable(data){
       <td><b>${formatGs(e.amount)}</b></td>
       <td><button class="linkbtn linkbtn--danger" type="button" title="Eliminar">🗑️</button></td>
     `;
-    tr.querySelector("button").addEventListener("click", ()=>{
+    tr.querySelector("button").addEventListener("click", async ()=>{
       if(!confirm("¿Eliminar este registro?")) return;
+
+      // Realtime: borrar remoto
+      if(RT.enabled && window.FirebaseRT){
+        try{
+          const col = window.FirebaseRT._collection("deliveries");
+          await window.FirebaseRT._deleteDoc(window.FirebaseRT._doc(col, e.id));
+          // RT listener refresca solo
+          toast("Eliminado");
+          return;
+        }catch(err){
+          console.warn("No se pudo borrar remoto:", err);
+        }
+      }
+
       const idx = data.entries.findIndex(x => x.id === e.id);
       if(idx >= 0){
         data.entries.splice(idx, 1);
@@ -307,40 +329,7 @@ function refresh(){
   renderTable(data);
 }
 
-function setQuickFilters(mode){
-  const today = new Date();
-  if(mode === "hoy"){
-    $("#f-from").value = toDateInputValue(today);
-    $("#f-to").value = toDateInputValue(today);
-  }
-  if(mode === "7d"){
-    const d = new Date();
-    d.setDate(d.getDate() - 6);
-    $("#f-from").value = toDateInputValue(d);
-    $("#f-to").value = toDateInputValue(today);
-  }
-}
 
-function exportCSV(data){
-  const filtered = getFilteredEntries(data).slice().reverse(); // oldest first
-  const lines = [];
-  lines.push(["fecha_hora","cliente","monto_gs"].join(","));
-  for(const e of filtered){
-    const dt = formatDateTime(e.ts);
-    const client = (e.client || "").replaceAll('"','""');
-    lines.push(`"${dt}","${client}",${Number(e.amount)||0}`);
-  }
-  const csv = lines.join("\n");
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `delivery_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
-}
 
 function setupPWAInstall(){
   let deferredPrompt = null;
@@ -371,66 +360,53 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   // Iniciar realtime (si configuraste Firebase). Si no, se usa localStorage.
   await initRealtime();
-  const data = loadData();
 
-  // default filters: today
-  setQuickFilters("hoy");
+  // Estado inicial
+  resetAmountUI();
+  refresh();
 
-  $("#btn-guardar").addEventListener("click", ()=>{
-    const client = normalizeClientName($("#txt-cliente").value);
-    if(!client){
-      toast("Falta el nombre/ubicación.");
-      $("#txt-cliente").focus();
+  // Guardar monto personalizado
+  onEl("#btn-custom-save","click", ()=>{
+    const raw = $("#custom-amount")?.value ?? "";
+    const v = Math.round(Number(raw));
+    if(!v || v <= 0){
+      toast("Escribí un monto válido");
+      $("#custom-amount")?.focus();
       return;
     }
-    if(!selectedAmount){
-      toast("Elegí un monto.");
-      return;
+    $("#selected-amount").textContent = `Monto: ${formatGs(v)}`;
+    trySaveDelivery(v);
+  });
+
+  // Borrar todo / resetear
+  onEl("#btn-borrar-todo","click", async ()=>{
+    if(!confirm("Esto borra TODO lo guardado. ¿Seguro?")) return;
+
+    // Si estás en modo realtime, borramos también en Firestore.
+    if(RT.enabled && window.FirebaseRT){
+      try{
+        const col = window.FirebaseRT._collection("deliveries");
+        await Promise.all((RT.entries||[]).map(e => window.FirebaseRT._deleteDoc(window.FirebaseRT._doc(col, e.id))));
+        RT.entries = [];
+        saveLocalCache([]);
+      }catch(err){
+        console.warn("No se pudo borrar remoto:", err);
+      }
     }
-    addEntry(data, client, selectedAmount);
-    $("#txt-cliente").value = "";
-    if(activeClientChip) activeClientChip.classList.remove("client--active");
-    activeClientChip = null;
-    toast("Guardado 🚀");
-    refresh();
-  });
 
-  $("#btn-limpiar").addEventListener("click", ()=>{
-    $("#txt-cliente").value = "";
-    $("#txt-cliente").focus();
-  });
-
-  $("#btn-hoy").addEventListener("click", ()=>{
-    setQuickFilters("hoy");
-    refresh();
-  });
-  $("#btn-7d").addEventListener("click", ()=>{
-    setQuickFilters("7d");
-    refresh();
-  });
-
-  $("#btn-borrar-todo").addEventListener("click", ()=>{
-    if(!confirm("Esto borra TODO lo guardado en este dispositivo. ¿Seguro?")) return;
     localStorage.removeItem(STORAGE_KEY);
-    selectedAmount = null;
-    $("#selected-amount").textContent = "Seleccioná un monto";
-    $$(".amount").forEach(x=>x.classList.remove("amount--active"));
-    $("#f-client").value = "";
-    setQuickFilters("hoy");
+    $("#txt-cliente").value = "";
+    $("#f-from").value = "";
+    $("#f-to").value = "";
+    $("#custom-amount") && ($("#custom-amount").value = "");
+    resetAmountUI();
     toast("Listo. Todo borrado.");
     refresh();
   });
 
-  $("#btn-export").addEventListener("click", ()=>{
-    exportCSV(loadData());
-  });
-
   // Refresh on filter changes
   ["change","input"].forEach(evt=>{
-    $("#f-from").addEventListener(evt, refresh);
-    $("#f-to").addEventListener(evt, refresh);
-    $("#f-client").addEventListener(evt, refresh);
+    onEl("#f-from", evt, refresh);
+    onEl("#f-to", evt, refresh);
   });
-
-  refresh();
 });
