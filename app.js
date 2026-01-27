@@ -46,6 +46,17 @@ async function initRealtime(){
     return false;
   }
 
+
+  // ⚡ Mostrar algo al instante:
+  // Si el listener todavía no devolvió datos, cargamos el cache local para que la lista sea visible al actualizar.
+  // Luego Firestore reemplaza/actualiza en vivo cuando llegue el snapshot.
+  try{
+    const cached = loadLocalCache();
+    if(Array.isArray(cached) && cached.length){
+      RT.entries = cached;
+      refresh();
+    }
+  }catch(e){}
   const col = window.FirebaseRT._collection("deliveries");
   const q = window.FirebaseRT._query(col, window.FirebaseRT._orderBy("ts", "desc"));
 
