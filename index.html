@@ -39,16 +39,15 @@
       <div class="amounts" id="amounts">
         <!-- buttons injected -->
       </div>
-
-      <div class="row">
-        <input id="custom-amount" class="input" type="number" inputmode="numeric" placeholder="Otro monto (Gs)..." min="0" />
-        <button class="btn btn--black" id="btn-custom-save" type="button">Guardar monto</button>
-      </div>
-
       <div class="row row--tight">
         <div class="pill" id="selected-amount">Seleccioná un monto</div>
         <!-- Guardado automático al tocar monto -->
       </div>
+      <div class="row row--tight">
+        <input id="custom-amount" class="input" type="number" inputmode="numeric" placeholder="Nuevo precio (opcional)" />
+        <button class="btn btn--black" id="btn-guardar-monto" type="button">Guardar monto</button>
+      </div>
+
 </section>
 
     <section class="card">
@@ -69,21 +68,13 @@
         </label>
 </div>
       <div class="row row--tight">
-<button class="btn btn--danger" id="btn-borrar-todo" type="button" title="Borra todo lo guardado">Borrar todo</button>
+        <button class="btn btn--danger" id="btn-borrar-todo" type="button" title="Borra todo lo guardado">Borrar todo</button>
       </div>
     </section>
 
     <section class="card">
       <div class="summary">
-        <div class="summary__item">
-          <div class="summary__label">Corridas</div>
-          <div class="summary__value" id="sum-corridas">0</div>
-        </div>
-        <div class="summary__item">
-          <div class="summary__label">Total general</div>
-          <div class="summary__value" id="sum-ganancias">Gs 0</div>
-        </div>
-      </div>
+</div>
 <h2 style="margin-top:14px;">Lista de deliveries</h2>
       <div class="tablewrap">
         <table class="table">
