@@ -41,13 +41,12 @@
       </div>
       <div class="row row--tight">
         <div class="pill" id="selected-amount">Seleccioná un monto</div>
-        <!-- Guardado automático al tocar monto -->
-      </div>
-      <div class="row row--tight">
-        <input id="custom-amount" class="input" type="number" inputmode="numeric" placeholder="Nuevo precio (opcional)" />
-        <button class="btn btn--black" id="btn-guardar-monto" type="button">Guardar monto</button>
       </div>
 
+      <div class="row row--tight">
+        <input id="custom-amount" class="input" inputmode="numeric" type="number" min="0" step="1" placeholder="Escribir otro monto (Gs)" />
+        <button class="btn btn--black" id="btn-custom-amount" type="button">Guardar monto</button>
+      </div>
 </section>
 
     <section class="card">
@@ -68,13 +67,17 @@
         </label>
 </div>
       <div class="row row--tight">
-        <button class="btn btn--danger" id="btn-borrar-todo" type="button" title="Borra todo lo guardado">Borrar todo</button>
+<button class="btn btn--danger" id="btn-borrar-todo" type="button" title="Borra todo lo guardado">Borrar todo</button>
       </div>
     </section>
 
     <section class="card">
       <div class="summary">
-</div>
+        <div class="summary__item">
+          <div class="summary__label">Total general</div>
+          <div class="summary__value" id="sum-total">Gs 0</div>
+        </div>
+      </div>
 <h2 style="margin-top:14px;">Lista de deliveries</h2>
       <div class="tablewrap">
         <table class="table">
@@ -90,7 +93,11 @@
         </table>
       </div>
     </section>
-</main>
+
+    <footer class="footer">
+      <div>Funciona offline ✅ · Datos guardados en el dispositivo · Ideal para celular 📱</div>
+    </footer>
+  </main>
 
   <div class="toast" id="toast" aria-live="polite"></div>
   <!-- Firebase (CDN) + config -->

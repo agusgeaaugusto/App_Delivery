@@ -128,8 +128,6 @@ function renderAmounts(){
       $$(".amount").forEach(x=>x.classList.remove("amount--active"));
       b.classList.add("amount--active");
       $("#selected-amount").textContent = `Monto: ${formatGs(v)}`;
-      const ca = $("#custom-amount");
-      if(ca) ca.value = String(v);
 
       const client = normalizeClientName($("#txt-cliente").value);
       if(client){
@@ -153,8 +151,8 @@ function normalizeClientName(s){
 }
 
 function getFilters(){
-  const from = $("#f-from").value;
-  const to = $("#f-to").value;
+  const from = $("#f-from")?.value || "";
+  const to = $("#f-to")?.value || "";
   return { from, to };
 }
 
@@ -177,21 +175,15 @@ function inDateRange(iso, from, to){
 
 function getFilteredEntries(data){
   const {from, to} = getFilters();
-  return data.entries
+  return (data.entries || [])
     .filter(e => inDateRange(e.ts, from, to))
     .sort((a,b)=> (a.ts < b.ts ? 1 : -1));
 }
 
-function summarize(entries){
-  const corridas = entries.length;
-  const subtotal = entries.reduce((acc,e)=> acc + (Number(e.amount)||0), 0);
-  return { corridas, subtotal };
-}
-
-function renderSummaryAllAndFiltered(data, filtered){
-  const all = data.entries;
-  $("#sum-corridas").textContent = all.length;
-  $("#sum-ganancias").textContent = formatGs(all.reduce((a,e)=>a+(Number(e.amount)||0),0));
+function renderTotal(data, filtered){
+  const total = (filtered || []).reduce((a,e)=> a + (Number(e.amount)||0), 0);
+  const el = $("#sum-total");
+  if(el) el.textContent = formatGs(total);
 }
 
 function renderTable(data){
@@ -207,26 +199,8 @@ function renderTable(data){
       <td><b>${formatGs(e.amount)}</b></td>
       <td><button class="linkbtn linkbtn--danger" type="button" title="Eliminar">🗑️</button></td>
     `;
-    tr.querySelector("button").addEventListener("click", async ()=>{
+    tr.querySelector("button").addEventListener("click", ()=>{
       if(!confirm("¿Eliminar este registro?")) return;
-
-      // Firebase: borrar remoto (si existe)
-      if(RT.enabled && window.FirebaseRT && e.id){
-        try{
-          const col = window.FirebaseRT._collection("deliveries");
-          const ref = window.FirebaseRT._doc(col, e.id);
-          await window.FirebaseRT._deleteDoc(ref);
-        }catch(err){ /* ignore */ }
-
-        // Borrar del cache local para que desaparezca al instante
-        RT.entries = (RT.entries || []).filter(x => x.id !== e.id);
-        saveLocalCache(RT.entries);
-        refresh();
-        toast("Eliminado");
-        return;
-      }
-
-      // Sin Firebase: borrar local
       const idx = data.entries.findIndex(x => x.id === e.id);
       if(idx >= 0){
         data.entries.splice(idx, 1);
@@ -235,11 +209,10 @@ function renderTable(data){
         toast("Eliminado");
       }
     });
-;
     tbody.appendChild(tr);
   });
 
-  renderSummaryAllAndFiltered(data, filtered);
+  renderTotal(data, filtered);
 }
 
 function escapeHtml(s){
@@ -272,7 +245,7 @@ function renderClients(data){
     .sort((a,b)=> (a[1].last < b[1].last ? 1 : -1));
 
   if(items.length === 0){
-    wrap.innerHTML = `<div class="mini">Todavía no hay clientes guardados. Empezá con el primero 👇</div>`;
+    wrap.innerHTML = ``;
     return;
   }
 
@@ -297,28 +270,19 @@ function renderClients(data){
 function addEntry(data, client, amount){
   const entry = { id: cryptoRandomId(), client, amount, ts: nowISO() };
 
-  // ✅ Mostrar al instante (aunque Firebase tarde en devolver snapshot)
-  if(RT.enabled){
-    RT.entries = [entry, ...(RT.entries || [])];
-    saveLocalCache(RT.entries);
-    refresh();
-
-    if(window.FirebaseRT){
-      const col = window.FirebaseRT._collection("deliveries");
-      window.FirebaseRT._addDoc(col, {
-        client,
-        amount,
-        ts: window.FirebaseRT._serverTimestamp(),
-        tsISO: entry.ts
-      }).catch(()=>{ /* si falla, al menos quedó en cache */ });
-    }
-    return;
+  if(RT.enabled && window.FirebaseRT){
+    const col = window.FirebaseRT._collection("deliveries");
+    return window.FirebaseRT._addDoc(col, {
+      client,
+      amount,
+      ts: window.FirebaseRT._serverTimestamp(),
+      tsISO: entry.ts
+    });
   }
 
   data.entries.push(entry);
   saveData(data);
 }
-
 
 function cryptoRandomId(){
   // short random id
@@ -331,41 +295,6 @@ function refresh(){
   const data = loadData();
   renderClients(data);
   renderTable(data);
-}
-
-function setQuickFilters(mode){
-  const today = new Date();
-  if(mode === "hoy"){
-    $("#f-from").value = toDateInputValue(today);
-    $("#f-to").value = toDateInputValue(today);
-  }
-  if(mode === "7d"){
-    const d = new Date();
-    d.setDate(d.getDate() - 6);
-    $("#f-from").value = toDateInputValue(d);
-    $("#f-to").value = toDateInputValue(today);
-  }
-}
-
-function exportCSV(data){
-  const filtered = getFilteredEntries(data).slice().reverse(); // oldest first
-  const lines = [];
-  lines.push(["fecha_hora","cliente","monto_gs"].join(","));
-  for(const e of filtered){
-    const dt = formatDateTime(e.ts);
-    const client = (e.client || "").replaceAll('"','""');
-    lines.push(`"${dt}","${client}",${Number(e.amount)||0}`);
-  }
-  const csv = lines.join("\n");
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `delivery_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
 }
 
 function setupPWAInstall(){
@@ -395,74 +324,78 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   renderAmounts();
   setupPWAInstall();
 
-  // Mostrar cache local de inmediato (para que al abrir la app SIEMPRE se vea la lista)
-  refresh();
+  // Mostrar algo INMEDIATO al iniciar (local cache) para que no quede vacío al refrescar.
+  try{ refresh(); }catch(e){}
 
-  // Iniciar realtime (si configuraste Firebase). Si no, queda localStorage.
-  await initRealtime();
-  refresh();
+  // Realtime (Firebase) si está configurado. Si no, queda localStorage.
+  try{ await initRealtime(); }catch(e){}
 
-  // Guardar monto personalizado (opcional)
-  const btnCustom = $("#btn-guardar-monto");
-  if(btnCustom){
-    btnCustom.addEventListener("click", ()=>{
-      const client = normalizeClientName($("#txt-cliente").value);
-      if(!client){
-        toast("Falta nombre/ubicación.");
-        $("#txt-cliente").focus();
-        return;
-      }
-      const amt = Number($("#custom-amount")?.value || 0);
-      if(!amt || amt <= 0){
-        toast("Escribí un precio válido.");
-        $("#custom-amount").focus();
-        return;
-      }
+  // Filtros vacíos por defecto (mostrar TODO)
+  const fFrom = $("#f-from"); const fTo = $("#f-to");
+  if(fFrom) fFrom.value = "";
+  if(fTo) fTo.value = "";
 
-      addEntry(loadData(), client, amt);
+  // Guardar monto custom
+  const saveCustom = ()=>{
+    const client = normalizeClientName($("#txt-cliente")?.value);
+    const raw = $("#custom-amount")?.value;
+    const v = Math.round(Number(raw)||0);
+    if(!client){
+      toast("Escribí nombre/ubicación primero");
+      $("#txt-cliente")?.focus();
+      return;
+    }
+    if(!(v > 0)){
+      toast("Escribí un monto válido");
+      $("#custom-amount")?.focus();
+      return;
+    }
+    addEntry(loadData(), client, v);
+    if($("#custom-amount")) $("#custom-amount").value = "";
+    if($("#txt-cliente")) $("#txt-cliente").value = "";
+    $("#selected-amount").textContent = "Seleccioná un monto";
+    $$(".amount").forEach(x=>x.classList.remove("amount--active"));
+    selectedAmount = null;
+    toast("Delivery guardado 🚀");
+    refresh();
+  };
 
-      // reset UI
-      $("#txt-cliente").value = "";
-      $("#custom-amount").value = "";
-      selectedAmount = null;
-      $("#selected-amount").textContent = "Seleccioná un monto";
-      $$(".amount").forEach(x=>x.classList.remove("amount--active"));
-      if(activeClientChip) activeClientChip.classList.remove("client--active");
-      activeClientChip = null;
+  $("#btn-custom-amount")?.addEventListener("click", saveCustom);
+  $("#custom-amount")?.addEventListener("keydown", (e)=>{
+    if(e.key === "Enter"){ e.preventDefault(); saveCustom(); }
+  });
 
-      toast("Guardado 🚀");
-    });
-  }
+  // Borrar todo / reset total
+  $("#btn-borrar-todo")?.addEventListener("click", async ()=>{
+    if(!confirm("Esto borra TODO lo guardado. ¿Seguro?")) return;
 
-  // Borrar todo (local + firebase si está activo) y reset UI
-  $("#btn-borrar-todo").addEventListener("click", async ()=>{
-    if(!confirm("Esto borra TODO. ¿Seguro?")) return;
+    // 1) Local
+    localStorage.removeItem(STORAGE_KEY);
+    saveLocalCache([]);
 
-    // Si hay Firebase activo, borramos lo remoto usando lo que ya tenemos en memoria
-    if(RT.enabled && window.FirebaseRT){
+    // 2) Realtime (si existe): borrar docs remotos del usuario
+    if(RT.enabled && window.FirebaseRT && typeof window.FirebaseRT._deleteDoc === "function"){
       try{
         const col = window.FirebaseRT._collection("deliveries");
-        const ids = (RT.entries || []).map(x=>x.id).filter(Boolean);
-        for(const id of ids){
+        const dels = (RT.entries || []).map(e=>{
           try{
-            await window.FirebaseRT._deleteDoc(window.FirebaseRT._doc(col, id));
-          }catch(e){}
-        }
+            const ref = window.FirebaseRT._doc(col, e.id);
+            return window.FirebaseRT._deleteDoc(ref);
+          }catch(_e){ return Promise.resolve(); }
+        });
+        await Promise.allSettled(dels);
+        RT.entries = [];
       }catch(e){}
     }
 
-    // Local
-    localStorage.removeItem(STORAGE_KEY);
-    RT.entries = [];
+    // 3) UI
     selectedAmount = null;
     $("#selected-amount").textContent = "Seleccioná un monto";
     $$(".amount").forEach(x=>x.classList.remove("amount--active"));
-    $("#txt-cliente").value = "";
-    const ca = $("#custom-amount"); if(ca) ca.value = "";
-    $("#f-from").value = "";
-    $("#f-to").value = "";
-    if(activeClientChip) activeClientChip.classList.remove("client--active");
-    activeClientChip = null;
+    if($("#txt-cliente")) $("#txt-cliente").value = "";
+    if($("#custom-amount")) $("#custom-amount").value = "";
+    if(fFrom) fFrom.value = "";
+    if(fTo) fTo.value = "";
 
     toast("Listo. Todo borrado.");
     refresh();
@@ -470,7 +403,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   // Refresh on filter changes
   ["change","input"].forEach(evt=>{
-    $("#f-from").addEventListener(evt, refresh);
-    $("#f-to").addEventListener(evt, refresh);
+    fFrom?.addEventListener(evt, refresh);
+    fTo?.addEventListener(evt, refresh);
   });
+
+  refresh();
 });
