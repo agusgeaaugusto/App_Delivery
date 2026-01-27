@@ -23,10 +23,7 @@
         <div class="brand__subtitle">Guardá rápido: nombre/ubicación + monto</div>
       </div>
     </div>
-    <div class="topbar__actions">
-      <button class="iconbtn" id="btn-settings" type="button" title="Configuración">⚙️</button>
-      <button class="btn btn--ghost" id="btn-install" type="button" hidden>Instalar</button>
-    </div>
+    <button class="btn btn--ghost" id="btn-install" type="button" hidden>Instalar</button>
   </header>
 
   <main class="wrap">
@@ -45,10 +42,6 @@
       <div class="amounts" id="amounts">
         <!-- buttons injected -->
       </div>
-      <div class="extra">
-        <input id="extra-amount" class="input" type="number" inputmode="numeric" min="0" step="100" placeholder="Monto extra (Gs) — ej: 15000" />
-        <button class="btn btn--black" id="btn-guardar-extra" type="button">Guardar extra</button>
-      </div>
       <div class="row row--tight">
         <div class="pill" id="selected-amount">Seleccioná un monto</div>
         <!-- Guardado automático al tocar monto -->
@@ -64,34 +57,47 @@
       <div class="mini">Estos bloques se quedan (se guardan en tu celular / navegador).</div>
     </section>
 
-    
     <section class="card">
       <h2>Filtros</h2>
-      <div class="filters filters--simple">
+      <div class="filters">
         <label class="field">
-          <span>Día</span>
-          <input class="input" id="f-day" type="date" />
+          <span>Desde</span>
+          <input class="input" id="f-from" type="date" />
+        </label>
+        <label class="field">
+          <span>Hasta</span>
+          <input class="input" id="f-to" type="date" />
         </label>
         <label class="field field--wide">
           <span>Cliente</span>
-          <input class="input" id="f-client" type="text" placeholder="Filtrar por nombre/ubicación..." />
+          <input class="input" id="f-client" type="text" placeholder="Buscar cliente..." />
         </label>
       </div>
-      <div class="mini">Por defecto muestra el día de hoy. Cambiá el día para ver corridas y subtotal de esa fecha.</div>
+      <div class="row row--tight">
+        <button class="btn btn--ghost" id="btn-hoy" type="button">Hoy</button>
+        <button class="btn btn--ghost" id="btn-7d" type="button">Últimos 7 días</button>
+        <button class="btn btn--danger" id="btn-borrar-todo" type="button" title="Borra todo lo guardado">Borrar todo</button>
+      </div>
     </section>
 
-
-    
     <section class="card">
-      <div class="summary summary--2">
+      <div class="summary">
         <div class="summary__item">
-          <div class="summary__label">Corridas (día)</div>
+          <div class="summary__label">Corridas</div>
           <div class="summary__value" id="sum-corridas">0</div>
         </div>
         <div class="summary__item">
-          <div class="summary__label">Ganancia (día)</div>
+          <div class="summary__label">Ganancias</div>
           <div class="summary__value" id="sum-ganancias">Gs 0</div>
         </div>
+        <div class="summary__item">
+          <div class="summary__label">Subtotal (filtro)</div>
+          <div class="summary__value" id="sum-subtotal">Gs 0</div>
+        </div>
+      </div>
+
+      <div class="row row--tight">
+        <button class="btn btn--black" id="btn-export" type="button">Exportar CSV</button>
       </div>
 
       <h2 style="margin-top:14px;">Lista de deliveries</h2>
@@ -110,7 +116,6 @@
       </div>
     </section>
 
-
     <footer class="footer">
       <div>Funciona offline ✅ · Datos guardados en el dispositivo · Ideal para celular 📱</div>
     </footer>
@@ -122,19 +127,5 @@
   <script type="module" src="firebase-app.js"></script>
 
   <script src="app.js"></script>
-
-  <div class="modal" id="settings-modal" aria-hidden="true">
-    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Configuración">
-      <div class="modal__head">
-        <div class="modal__title">Configuración</div>
-        <button class="iconbtn" id="btn-settings-close" type="button" title="Cerrar">✖</button>
-      </div>
-      <div class="modal__body">
-        <button class="btn btn--danger" id="btn-borrar-todo" type="button">Borrar todo</button>
-        <div class="mini" style="margin-top:8px;">Borra todos los registros del dispositivo. Si usás Firebase, también borra tus registros en la nube.</div>
-      </div>
-    </div>
-  </div>
-
 </body>
 </html>

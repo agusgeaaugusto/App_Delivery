@@ -31,13 +31,6 @@ function toDateInputValue(d){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
-function isSameDay(iso, dayStr){
-  if(!dayStr) return true;
-  const d = new Date(iso);
-  const [yy,mm,dd] = dayStr.split("-").map(Number);
-  return d.getFullYear()===yy && (d.getMonth()+1)===mm && d.getDate()===dd;
-}
-
 
 // ===== Firebase Realtime (opcional) =====
 let RT = { enabled: false, entries: [], unsub: null };
@@ -53,17 +46,6 @@ async function initRealtime(){
     return false;
   }
 
-
-  // ⚡ Mostrar algo al instante:
-  // Si el listener todavía no devolvió datos, cargamos el cache local para que la lista sea visible al actualizar.
-  // Luego Firestore reemplaza/actualiza en vivo cuando llegue el snapshot.
-  try{
-    const cached = loadLocalCache();
-    if(Array.isArray(cached) && cached.length){
-      RT.entries = cached;
-      refresh();
-    }
-  }catch(e){}
   const col = window.FirebaseRT._collection("deliveries");
   const q = window.FirebaseRT._query(col, window.FirebaseRT._orderBy("ts", "desc"));
 
@@ -158,9 +140,11 @@ function normalizeClientName(s){
 }
 
 function getFilters(){
-  const day = $("#f-day") ? $("#f-day").value : "";
+  const from = $("#f-from").value;
+  const to = $("#f-to").value;
   const client = normalizeClientName($("#f-client").value).toLowerCase();
-  return { day, client };
+
+  return { from, to, client };
 }
 
 function inDateRange(iso, from, to){
@@ -181,9 +165,9 @@ function inDateRange(iso, from, to){
 }
 
 function getFilteredEntries(data){
-  const {day, client} = getFilters();
+  const {from, to, client} = getFilters();
   return data.entries
-    .filter(e => isSameDay(e.ts, day))
+    .filter(e => inDateRange(e.ts, from, to))
     .filter(e => !client || (e.client || "").toLowerCase().includes(client))
     .sort((a,b)=> (a.ts < b.ts ? 1 : -1));
 }
@@ -195,8 +179,10 @@ function summarize(entries){
 }
 
 function renderSummaryAllAndFiltered(data, filtered){
-  $("#sum-corridas").textContent = filtered.length;
-  $("#sum-ganancias").textContent = formatGs(filtered.reduce((a,e)=>a+(Number(e.amount)||0),0));
+  const all = data.entries;
+  $("#sum-corridas").textContent = all.length;
+  $("#sum-ganancias").textContent = formatGs(all.reduce((a,e)=>a+(Number(e.amount)||0),0));
+  $("#sum-subtotal").textContent = formatGs(filtered.reduce((a,e)=>a+(Number(e.amount)||0),0));
 }
 
 function renderTable(data){
@@ -310,6 +296,12 @@ function refresh(){
   renderTable(data);
 }
 
+function setQuickFilters(mode){
+  const today = new Date();
+  if(mode === "hoy"){
+    $("#f-from").value = toDateInputValue(today);
+    $("#f-to").value = toDateInputValue(today);
+  }
   if(mode === "7d"){
     const d = new Date();
     d.setDate(d.getDate() - 6);
@@ -362,19 +354,6 @@ function setupPWAInstall(){
   }
 }
 
-function openSettings(){
-  const m = $("#settings-modal");
-  if(!m) return;
-  m.classList.add("modal--show");
-  m.setAttribute("aria-hidden","false");
-}
-function closeSettings(){
-  const m = $("#settings-modal");
-  if(!m) return;
-  m.classList.remove("modal--show");
-  m.setAttribute("aria-hidden","true");
-}
-
 document.addEventListener("DOMContentLoaded", async ()=>{
   renderAmounts();
   setupPWAInstall();
@@ -410,76 +389,37 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     $("#txt-cliente").focus();
   });
 
-  // Guardar monto extra (cuando no está en los bloques)
-  const btnExtra = $("#btn-guardar-extra");
-  if(btnExtra){
-    btnExtra.addEventListener("click", async ()=>{
-      const client = normalizeClientName($("#txt-cliente").value);
-      const val = Number($("#extra-amount").value || 0);
-      if(!client){
-        toast("Falta nombre/ubicación.");
-        $("#txt-cliente").focus();
-        return;
-      }
-      if(!val || val <= 0){
-        toast("Ingresá un monto extra válido.");
-        $("#extra-amount").focus();
-        return;
-      }
-      await addEntry(loadData(), client, val);
-      $("#txt-cliente").value = "";
-      $("#extra-amount").value = "";
-      toast("Extra guardado ✅");
-      refresh();
-    });
-  }
-refresh();
+  $("#btn-hoy").addEventListener("click", ()=>{
+    setQuickFilters("hoy");
+    refresh();
   });
-refresh();
+  $("#btn-7d").addEventListener("click", ()=>{
+    setQuickFilters("7d");
+    refresh();
   });
 
-  $("#btn-borrar-todo").addEventListener("click", async ()=>{
-    if(!confirm("Esto borra TODO lo guardado. ¿Seguro?")) return;
-
-    // Firebase: borrar todos los docs del usuario (si está activo)
-    if(RT.enabled && window.FirebaseRT){
-      try{
-        const ids = (RT.entries || []).map(e=>e.id);
-        const ns = (window.DELIVERY_NAMESPACE||"default").toString().trim()||"default";
-        const colPath = `namespaces/${ns}/users/${window.FirebaseRT.uid}/deliveries`;
-        for(const id of ids){
-          const ref = window.FirebaseRT._doc(window.FirebaseRT._db, colPath, id);
-          await window.FirebaseRT._deleteDoc(ref);
-        }
-      }catch(e){
-        // si algo falla, seguimos con local
-      }
-    }
-
+  $("#btn-borrar-todo").addEventListener("click", ()=>{
+    if(!confirm("Esto borra TODO lo guardado en este dispositivo. ¿Seguro?")) return;
     localStorage.removeItem(STORAGE_KEY);
-    RT.entries = [];
     selectedAmount = null;
     $("#selected-amount").textContent = "Seleccioná un monto";
     $$(".amount").forEach(x=>x.classList.remove("amount--active"));
     $("#f-client").value = "";
-    if($("#f-day")) $("#f-day").value = toDateInputValue(new Date());
-    toast("Todo borrado ✅");
+    setQuickFilters("hoy");
+    toast("Listo. Todo borrado.");
     refresh();
-    closeSettings();
   });
-});
 
-    // Refresh on filter changes
+  $("#btn-export").addEventListener("click", ()=>{
+    exportCSV(loadData());
+  });
+
+  // Refresh on filter changes
   ["change","input"].forEach(evt=>{
-    if($("#f-day")) $("#f-day").addEventListener(evt, refresh);
+    $("#f-from").addEventListener(evt, refresh);
+    $("#f-to").addEventListener(evt, refresh);
     $("#f-client").addEventListener(evt, refresh);
   });
-
-  // Configuración (modal)
-  if($("#btn-settings")) $("#btn-settings").addEventListener("click", openSettings);
-  if($("#btn-settings-close")) $("#btn-settings-close").addEventListener("click", closeSettings);
-  const sm = $("#settings-modal");
-  if(sm) sm.addEventListener("click", (e)=>{ if(e.target === sm) closeSettings(); });
 
   refresh();
 });
